@@ -1,5 +1,6 @@
-ARG BUILD_FROM=python:3.13-slim-bookworm
-FROM ${BUILD_FROM}
+# A Supervisor BUILD_FROM-ként az Alpine-alapú HA base image-et adná, de a sherpa-onnx-nak glibc kell,
+# ezért a Debian-alapú Python image-et közvetlenül használjuk (a build.yaml elavult, a Supervisor figyelmen kívül hagyja).
+FROM docker.io/library/python:3.13-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 
@@ -23,6 +24,8 @@ COPY app /app
 WORKDIR /app
 ENV PYTHONPATH=/app HF_MODEL=/models/campplus.onnx HF_VAD=/models/silero_vad.onnx
 
-LABEL io.hass.type="addon" io.hass.version="0.1.0"
+LABEL org.opencontainers.image.title="Hangfelismerő" \
+      org.opencontainers.image.description="Beszélőfelismerő Wyoming proxy Home Assistanthez" \
+      org.opencontainers.image.licenses="MIT"
 
 CMD ["python", "-m", "hangfelismero"]
