@@ -1,0 +1,26 @@
+configuration:
+  upstream_uri:
+    name: Beszédfelismerő címe
+    description: A valódi beszéd-szöveg szolgáltatás (Wyoming), ahová a hangot továbbküldi. A Whisper app esetén tcp://core-whisper:10300.
+  port:
+    name: Wyoming port
+    description: Ezen a porton csatlakozik a hangpipeline.
+  threads:
+    name: Processzorszálak
+    description: Hány szálon számolja a hangazonosítást. 2 bőven elég.
+  log_level:
+    name: Naplózás szintje
+  mqtt_enabled:
+    name: MQTT szenzorok
+    description: A beszélő nevét MQTT-n küldi Home Assistantnek (sensor.hangfelismero_beszelo). A Sentient ebből tudja, ki beszél.
+  mqtt_host:
+    name: MQTT bróker (opcionális)
+    description: Üresen hagyva a Mosquitto appot használja automatikusan.
+  mqtt_port:
+    name: MQTT port (opcionális)
+  mqtt_username:
+    name: MQTT felhasználó (opcionális)
+  mqtt_password:
+    name: MQTT jelszó (opcionális)
+network:
+  10360/tcp: Wyoming (a hangpipeline ide csatlakozik)

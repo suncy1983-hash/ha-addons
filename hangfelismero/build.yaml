@@ -1,0 +1,7 @@
+build_from:
+  amd64: python:3.13-slim-bookworm
+  aarch64: python:3.13-slim-bookworm
+labels:
+  org.opencontainers.image.title: Hangfelismerő
+  org.opencontainers.image.description: Beszélőfelismerő Wyoming proxy Home Assistanthez
+  org.opencontainers.image.licenses: MIT

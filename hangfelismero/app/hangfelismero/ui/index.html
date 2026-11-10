@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hangfelismerő</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --card: #ffffff; --text: #1d2330; --muted: #6b7280; --line: #e5e7eb;
+    --accent: #2563eb; --accent-soft: #e0e9ff; --ok: #15803d; --ok-soft: #dcfce7;
+    --warn: #b45309; --warn-soft: #fef3c7; --bad: #b91c1c; --bad-soft: #fee2e2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111318; --card: #1b1e25; --text: #e7e9ee; --muted: #9aa1ad; --line: #2a2f39;
+      --accent: #6b9bff; --accent-soft: #1f2b47; --ok: #4ade80; --ok-soft: #14301f;
+      --warn: #fbbf24; --warn-soft: #3a2c0c; --bad: #f87171; --bad-soft: #3b1515;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 22px; margin: 4px 0 2px; }
+  h2 { font-size: 16px; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
+  .sub { color: var(--muted); margin: 0 0 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .grow { flex: 1 1 160px; min-width: 0; }
+  input, select, button { font: inherit; color: inherit; }
+  input[type=text], select { background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 7px 10px; }
+  button { border: 1px solid var(--line); background: var(--card); border-radius: 9px; padding: 7px 12px; cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.ghost { border-color: transparent; background: transparent; color: var(--muted); padding: 5px 8px; }
+  button.danger { color: var(--bad); }
+  button:disabled { opacity: .5; cursor: default; }
+  .speakers { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+  .speaker { border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+  .speaker header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .speaker .name { font-weight: 600; font-size: 16px; flex: 1; }
+  .pill { display: inline-block; border-radius: 999px; padding: 1px 9px; font-size: 12.5px; white-space: nowrap; }
+  .pill.ok { background: var(--ok-soft); color: var(--ok); }
+  .pill.warn { background: var(--warn-soft); color: var(--warn); }
+  .pill.bad { background: var(--bad-soft); color: var(--bad); }
+  .pill.info { background: var(--accent-soft); color: var(--accent); }
+  .samples { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chip { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 999px; padding: 0 2px 0 8px; font-size: 12.5px; color: var(--muted); }
+  .chip button { padding: 2px 6px; border: 0; background: none; }
+  .muted { color: var(--muted); }
+  .small { font-size: 13px; }
+  .recent { width: 100%; border-collapse: collapse; }
+  .recent td { border-top: 1px solid var(--line); padding: 9px 6px; vertical-align: middle; }
+  .recent .text { max-width: 320px; }
+  .score { font-variant-numeric: tabular-nums; }
+  .empty { color: var(--muted); padding: 8px 0; }
+  .settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px 20px; }
+  .settings label { display: block; font-weight: 500; }
+  .settings .hint { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  input[type=range] { width: 100%; }
+  .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--text); color: var(--bg);
+           padding: 10px 16px; border-radius: 10px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90vw; }
+  .toast.show { opacity: 1; }
+  .status { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  @media (max-width: 640px) {
+    main { padding: 12px 16px; }
+    .recent thead { display: none; }
+    .recent tr { display: grid; grid-template-columns: auto 1fr; padding: 8px 0; border-top: 1px solid var(--line); }
+    .recent td { border: 0; padding: 3px 0; }
+    .recent td.who, .recent td.actions { grid-column: 2; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Hangfelismerő</h1>
+  <p class="sub">Megtanulja, kinek a hangja szól a hangsegédben, és ezt átadja Home Assistantnek és a Sentientnek.</p>
+  <div class="status" id="status"></div>
+
+  <section class="card">
+    <h2>Beszélők</h2>
+    <div class="row" style="margin-bottom:12px">
+      <input type="text" id="newName" class="grow" placeholder="Új beszélő neve, pl. Sanya" maxlength="40">
+      <button class="primary" id="addSpeaker">Hozzáadás</button>
+    </div>
+    <div class="speakers" id="speakers"></div>
+  </section>
+
+  <section class="card">
+    <h2>Legutóbbi hangok <span class="pill info" id="recentCount"></span></h2>
+    <p class="muted small" style="margin-top:-6px">Beszélj a hangsegédhez, aztán itt mondd meg, ki volt az. Beszélőnként 3–5 minta elég az induláshoz; utána a biztos találatokból magától tanul tovább.</p>
+    <table class="recent"><thead><tr><th></th><th style="text-align:left">Elhangzott</th><th style="text-align:left">Felismerve</th><th></th></tr></thead>
+      <tbody id="recent"></tbody></table>
+  </section>
+
+  <section class="card">
+    <h2>Minta feltöltése</h2>
+    <p class="muted small" style="margin-top:-6px">Telefonon felvett hangüzenet is jó (wav, mp3, m4a, ogg). Mintánként 3–10 másodperc természetes beszéd az ideális.</p>
+    <div class="row">
+      <select id="uploadName" class="grow"></select>
+      <input type="file" id="uploadFile" accept="audio/*" multiple class="grow">
+      <button class="primary" id="uploadBtn">Feltöltés</button>
+      <button id="testBtn">Csak kipróbálás</button>
+    </div>
+    <div id="testResult" class="small" style="margin-top:10px"></div>
+  </section>
+
+  <section class="card">
+    <h2>Beállítások</h2>
+    <div class="settings">
+      <div><label>Felismerési küszöb: <span id="thresholdV"></span></label>
+        <input type="range" id="threshold" min="0.25" max="0.85" step="0.01">
+        <div class="hint">Ennyire kell hasonlítania a hangnak a profilhoz. Magasabb = kevesebb tévedés, de többször „ismeretlen”.</div></div>
+      <div><label>Különbség a második helyezetthez: <span id="marginV"></span></label>
+        <input type="range" id="margin" min="0" max="0.3" step="0.01">
+        <div class="hint">Ha két ember hangja közel áll egymáshoz, ennyivel kell jobbnak lennie a győztesnek.</div></div>
+      <div><label><input type="checkbox" id="auto_enroll"> Tanuljon a biztos találatokból</label>
+        <div class="hint">A nagyon biztos felismerések bekerülnek a profilba, így a hang változását is követi.</div>
+        <label style="margin-top:8px">Ennyitől biztos: <span id="auto_enroll_scoreV"></span></label>
+        <input type="range" id="auto_enroll_score" min="0.5" max="0.95" step="0.01"></div>
+      <div><label><input type="checkbox" id="block_unknown"> Ismeretlen hang parancsát ne hajtsa végre</label>
+        <div class="hint">Pl. ha a tévé „beszél bele”. Csak akkor kapcsold be, ha már mindenki be van tanítva.</div></div>
+      <div><label>Minták beszélőnként: <span id="max_samplesV"></span></label>
+        <input type="range" id="max_samples" min="5" max="100" step="1"></div>
+      <div><label>Megőrzött legutóbbi hangok: <span id="keep_recentV"></span></label>
+        <input type="range" id="keep_recent" min="0" max="300" step="10">
+        <div class="hint">0 = semmit nem ment el (betanítani csak feltöltéssel lehet).</div></div>
+    </div>
+    <div class="row" style="margin-top:14px"><button class="primary" id="saveSettings">Mentés</button></div>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let state = { speakers: [], recent: [], settings: {} };
+let settingsDirty = false;
+const REASONS = { ok: "", rovid: "túl rövid", nincs_profil: "még nincs profil", gyenge: "nem hasonlít senkire", bizonytalan: "nem egyértelmű", hiba: "hiba" };
+const RANGES = ["threshold", "margin", "auto_enroll_score", "max_samples", "keep_recent"];
+
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2600); }
+async function api(path, opts = {}) {
+  const r = await fetch("api/" + path, opts);
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(body.error || (body.errors || []).join("; ") || r.statusText);
+  return body;
+}
+const json = (method, data) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const pct = (x) => Math.round((x || 0) * 100) + "%";
+const when = (ts) => new Date(ts * 1000).toLocaleString("hu-HU", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+let audioEl;
+function play(kind, id) { if (audioEl) audioEl.pause(); audioEl = new Audio(`api/audio/${kind}/${encodeURIComponent(id)}`); audioEl.play(); }
+
+async function load() {
+  try { state = await api("state"); render(); } catch (e) { toast("Nem sikerült betölteni: " + e.message); }
+}
+
+function render() {
+  const st = state.status || {};
+  $("status").innerHTML = [
+    `<span class="pill ${st.upstream_ok ? "ok" : "bad"}">Beszédfelismerő: ${esc(st.upstream || "?")}${st.upstream_ok ? "" : " — nem érhető el"}</span>`,
+    `<span class="pill ${st.mqtt ? "ok" : "warn"}">MQTT: ${st.mqtt ? "kapcsolódva" : "nincs kapcsolat"}</span>`,
+    `<span class="pill info">Wyoming port: ${esc(st.port || "")}</span>`,
+  ].join("");
+
+  const sp = state.speakers;
+  $("speakers").innerHTML = sp.length ? sp.map((s) => {
+    const n = s.samples.length;
+    const level = n >= 5 ? ["ok", "jól betanítva"] : n >= 3 ? ["warn", "használható"] : ["bad", n ? "kevés minta" : "nincs minta"];
+    return `<div class="speaker" data-name="${esc(s.name)}">
+      <header><span class="name">${esc(s.name)}</span><span class="pill ${level[0]}">${n} minta · ${level[1]}</span></header>
+      <div class="row small"><span class="muted">HA személy:</span>
+        <input type="text" class="grow person" value="${esc(s.person || "")}" placeholder="person.${esc(s.name.toLowerCase())}"></div>
+      <div class="samples">${s.samples.slice().reverse().map((x) => `<span class="chip" title="${when(x.created)} · ${esc(x.source)}">${x.seconds}s
+        <button title="Lejátszás" data-play="${esc(x.id)}">▶</button><button title="Törlés" data-delsample="${esc(x.id)}">✕</button></span>`).join("")}</div>
+      <div class="row" style="margin-top:10px"><button class="ghost" data-rename>Átnevezés</button><button class="ghost danger" data-delspeaker>Törlés</button></div>
+    </div>`;
+  }).join("") : `<div class="empty">Még nincs beszélő. Adj hozzá egyet fent, vagy rendelj hozzá egy hangot lent.</div>`;
+
+  const opts = sp.map((s) => `<option value="${esc(s.name)}">${esc(s.name)}</option>`).join("");
+  const chosen = $("uploadName").value;
+  $("uploadName").innerHTML = opts || `<option value="">— előbb adj hozzá beszélőt —</option>`;
+  if (chosen && sp.some((s) => s.name === chosen)) $("uploadName").value = chosen;
+
+  $("recentCount").textContent = state.recent.length || "";
+  $("recent").innerHTML = state.recent.length ? state.recent.map((r) => {
+    const label = r.speaker ? `<span class="pill ok">${esc(r.speaker)}</span>`
+      : `<span class="pill ${r.reason === "rovid" ? "warn" : "bad"}">ismeretlen</span>${r.nearest ? ` <span class="muted small">(${esc(r.nearest)}?)</span>` : ""}`;
+    return `<tr data-rid="${esc(r.id)}">
+      <td><button class="ghost" data-playrecent="${esc(r.id)}" title="Lejátszás">▶</button></td>
+      <td class="text"><div>${esc(r.transcript) || '<span class="muted">(nincs szöveg)</span>'}</div><div class="muted small">${when(r.time)}${REASONS[r.reason] ? " · " + REASONS[r.reason] : ""}</div></td>
+      <td class="who">${label} <span class="score muted small">${r.score ? pct(r.score) : ""}</span></td>
+      <td class="actions"><div class="row">
+        <select class="assignSel"><option value="">Ki volt?</option>${opts}<option value="__new">+ új beszélő…</option></select>
+        <button class="primary" data-assign ${r.reason === "rovid" ? 'disabled title="Túl rövid a betanításhoz"' : ""}>Mentés</button>
+        <button class="ghost" data-delrecent title="Elvetés">✕</button></div></td></tr>`;
+  }).join("") : `<tr><td colspan="4" class="empty">Még nem érkezett hang. Válaszd ki ezt a szolgáltatást a hangsegéd beszédfelismerőjének, és mondj valamit.</td></tr>`;
+  for (const tr of document.querySelectorAll("#recent tr[data-rid]")) {
+    const r = state.recent.find((x) => x.id === tr.dataset.rid);
+    const sel = tr.querySelector(".assignSel");
+    if (r && sel) sel.value = r.speaker || r.nearest || "";
+  }
+
+  if (!settingsDirty) {
+    const s = state.settings;
+    for (const k of RANGES) { $(k).value = s[k]; showVal(k); }
+    $("auto_enroll").checked = !!s.auto_enroll;
+    $("block_unknown").checked = !!s.block_unknown;
+  }
+}
+function showVal(k) { const v = Number($(k).value); $(k + "V").textContent = ["max_samples", "keep_recent"].includes(k) ? v : pct(v); }
+for (const k of RANGES) $(k).addEventListener("input", () => { settingsDirty = true; showVal(k); });
+for (const k of ["auto_enroll", "block_unknown"]) $(k).addEventListener("change", () => { settingsDirty = true; });
+
+$("addSpeaker").onclick = async () => {
+  const name = $("newName").value.trim(); if (!name) return;
+  try { await api("speakers", json("POST", { name })); $("newName").value = ""; toast(`${name} hozzáadva`); load(); } catch (e) { toast(e.message); }
+};
+$("newName").addEventListener("keydown", (e) => { if (e.key === "Enter") $("addSpeaker").click(); });
+
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  const card = b.closest(".speaker"), row = b.closest("tr[data-rid]");
+  try {
+    if (b.dataset.play) play("sample", b.dataset.play);
+    else if (b.dataset.playrecent) play("recent", b.dataset.playrecent);
+    else if (b.dataset.delsample) { await api("samples/" + encodeURIComponent(b.dataset.delsample), { method: "DELETE" }); load(); }
+    else if (b.hasAttribute("data-delspeaker")) {
+      const name = card.dataset.name;
+      if (confirm(`Törlöd ${name} profilját az összes mintájával?`)) { await api("speakers/" + encodeURIComponent(name), { method: "DELETE" }); load(); }
+    } else if (b.hasAttribute("data-rename")) {
+      const name = card.dataset.name, nn = prompt("Új név:", name);
+      if (nn && nn.trim() && nn.trim() !== name) { await api("speakers/" + encodeURIComponent(name), json("PATCH", { new_name: nn.trim() })); load(); }
+    } else if (b.hasAttribute("data-delrecent")) { await api("recent/" + encodeURIComponent(row.dataset.rid), { method: "DELETE" }); load(); }
+    else if (b.hasAttribute("data-assign")) {
+      let name = row.querySelector(".assignSel").value;
+      if (name === "__new") name = (prompt("Az új beszélő neve:") || "").trim();
+      if (!name) { toast("Válaszd ki, ki beszélt"); return; }
+      b.disabled = true; await api(`recent/${encodeURIComponent(row.dataset.rid)}/assign`, json("POST", { name })); toast(`Mentve: ${name}`); load();
+    }
+  } catch (err) { toast(err.message); b.disabled = false; }
+});
+document.addEventListener("change", async (e) => {
+  if (!e.target.classList.contains("person")) return;
+  const name = e.target.closest(".speaker").dataset.name;
+  try { await api("speakers/" + encodeURIComponent(name), json("PATCH", { person: e.target.value.trim() })); toast("Mentve"); } catch (err) { toast(err.message); }
+});
+
+function formWithFiles() {
+  const files = $("uploadFile").files; if (!files.length) { toast("Válassz hangfájlt"); return null; }
+  const fd = new FormData(); fd.append("name", $("uploadName").value);
+  for (const f of files) fd.append("file", f, f.name);
+  return fd;
+}
+$("uploadBtn").onclick = async () => {
+  if (!$("uploadName").value) { toast("Előbb adj hozzá beszélőt"); return; }
+  const fd = formWithFiles(); if (!fd) return;
+  $("uploadBtn").disabled = true;
+  try { const r = await api("upload", { method: "POST", body: fd }); toast(`${r.added} minta hozzáadva` + (r.errors.length ? ` (${r.errors.length} hibás)` : "")); $("uploadFile").value = ""; load(); }
+  catch (e) { toast(e.message); } finally { $("uploadBtn").disabled = false; }
+};
+$("testBtn").onclick = async () => {
+  const fd = formWithFiles(); if (!fd) return;
+  try {
+    const r = await api("test", { method: "POST", body: fd });
+    const ranks = Object.entries(r.scores).sort((a, b) => b[1] - a[1]).map(([n, v]) => `${esc(n)} ${pct(v)}`).join(" · ");
+    $("testResult").innerHTML = `<b>${r.speaker ? esc(r.speaker) : "ismeretlen"}</b> ${REASONS[r.reason] ? "(" + REASONS[r.reason] + ")" : ""} — ${ranks || "nincs profil"} <span class="muted">(${r.seconds} mp beszéd)</span>`;
+  } catch (e) { toast(e.message); }
+};
+$("saveSettings").onclick = async () => {
+  const data = {}; for (const k of RANGES) data[k] = Number($(k).value);
+  data.auto_enroll = $("auto_enroll").checked; data.block_unknown = $("block_unknown").checked;
+  try { await api("settings", json("POST", data)); settingsDirty = false; toast("Beállítások mentve"); load(); } catch (e) { toast(e.message); }
+};
+
+load();
+setInterval(() => { if (!document.hidden && !document.activeElement?.matches("input,select")) load(); }, 5000);
+</script>
+</body>
+</html>

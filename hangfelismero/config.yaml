@@ -1,0 +1,40 @@
+name: Hangfelismerő
+version: "0.1.0"
+slug: hangfelismero
+description: Felismeri, ki beszél a hangsegédhez, és átadja a Sentientnek (Wyoming proxy a Whisper elé)
+url: https://github.com/suncy1983-hash/ha-addons
+arch:
+  - amd64
+  - aarch64
+init: false
+startup: services
+boot: auto
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:account-voice
+panel_title: Hangfelismerő
+hassio_api: true
+discovery:
+  - wyoming
+services:
+  - mqtt:want
+ports:
+  10360/tcp: 10360
+ports_description:
+  10360/tcp: Wyoming (a hangpipeline ide csatlakozik)
+options:
+  upstream_uri: tcp://core-whisper:10300
+  port: 10360
+  threads: 2
+  log_level: info
+  mqtt_enabled: true
+schema:
+  upstream_uri: str
+  port: port
+  threads: int(1,8)
+  log_level: list(debug|info|warning|error)
+  mqtt_enabled: bool
+  mqtt_host: str?
+  mqtt_port: port?
+  mqtt_username: str?
+  mqtt_password: password?

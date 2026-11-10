@@ -1,0 +1,26 @@
+configuration:
+  upstream_uri:
+    name: Speech-to-text address
+    description: The real Wyoming speech-to-text service the audio is forwarded to. For the Whisper app use tcp://core-whisper:10300.
+  port:
+    name: Wyoming port
+    description: The voice pipeline connects to this port.
+  threads:
+    name: CPU threads
+    description: Threads used for speaker recognition. 2 is plenty.
+  log_level:
+    name: Log level
+  mqtt_enabled:
+    name: MQTT sensors
+    description: Publishes the speaker's name to Home Assistant over MQTT (sensor.hangfelismero_beszelo).
+  mqtt_host:
+    name: MQTT broker (optional)
+    description: Leave empty to use the Mosquitto app automatically.
+  mqtt_port:
+    name: MQTT port (optional)
+  mqtt_username:
+    name: MQTT username (optional)
+  mqtt_password:
+    name: MQTT password (optional)
+network:
+  10360/tcp: Wyoming (the voice pipeline connects here)
