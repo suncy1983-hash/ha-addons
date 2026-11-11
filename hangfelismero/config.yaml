@@ -1,5 +1,5 @@
 name: Hangfelismerő
-version: "0.2.0"
+version: "0.2.1"
 slug: hangfelismero
 description: Felismeri, ki beszél a hangsegédhez, és átadja a Sentientnek (Wyoming proxy a Whisper vagy a Home Assistant felhős STT elé)
 url: https://github.com/suncy1983-hash/ha-addons

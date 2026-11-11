@@ -147,6 +147,10 @@ class HaSttSession:
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=TIMEOUT)) as session:
             async with session.post(self.target.url, data=self._body(), headers=headers) as resp:
                 body = await resp.json(content_type=None)
+                if resp.status < 400 and isinstance(body, dict) and body.get("result") == "error":
+                    # a szolgáltató nem ismert fel beszédet (csend, zaj): ez nem hiba, csak üres szöveg
+                    _LOGGER.info("A beszédfelismerő (%s) nem ismert fel szöveget", self.target.engine)
+                    return ""
                 if resp.status >= 400 or not isinstance(body, dict) or body.get("result") != "success":
                     raise ConnectionError(f"a beszédfelismerő ({self.target.engine}) hibát jelzett: "
                                           f"HTTP {resp.status} {body}")

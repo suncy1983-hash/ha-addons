@@ -1,5 +1,9 @@
 # Változások
 
+## 0.2.1
+
+- Javítva: ha a felhős szövegfelismerő nem ismer fel beszédet, üres szöveget ad vissza hiba helyett
+
 ## 0.2.0
 
 - Új: a szövegfelismerést a Home Assistant saját STT szolgáltatása is végezheti, pl. a Nabu Casa felhő

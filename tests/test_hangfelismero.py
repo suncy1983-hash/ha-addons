@@ -223,6 +223,9 @@ async def _fake_ha(port: int, received: dict):
         return web.json_response({"languages": ["hu-HU", "en-US"], "formats": ["wav"]})
 
     async def stt(request: web.Request):
+        if received.get("no_speech"):
+            await request.read()
+            return web.json_response({"result": "error", "text": None})
         received["engine"] = request.match_info["engine"]
         received["meta"] = request.headers.get("X-Speech-Content")
         received["bytes"] = len(await request.read())
@@ -260,12 +263,14 @@ def test_proxy_home_assistant_stt(store, monkeypatch):
                 described = Info.from_event(await c.read_event())
             assert described.asr[0].models[0].languages == ["en", "en-US", "hu", "hu-HU"]
             assert await _say(18460, tone(200, noise=0.01)) == "indítsd el a netflixet"
+            received["no_speech"] = True                      # a felhő nem ért semmit: üres szöveg, nem hiba
+            assert await _say(18460, tone(200, noise=0.01)) == ""
         finally:
             task.cancel()
             await runner.cleanup()
 
     asyncio.run(scenario())
-    assert published == [("Anna", "indítsd el a netflixet")]
+    assert published == [("Anna", "indítsd el a netflixet"), ("Anna", "")]
     assert received["engine"] == "stt.home_assistant_cloud"
     assert "language=hu-HU" in received["meta"] and "sample_rate=16000" in received["meta"]
     assert received["bytes"] == len(pcm(tone(200)))
