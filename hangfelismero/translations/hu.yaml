@@ -1,7 +1,7 @@
 configuration:
   upstream_uri:
     name: Beszédfelismerő címe
-    description: A valódi beszéd-szöveg szolgáltatás (Wyoming), ahová a hangot továbbküldi. A Whisper app esetén tcp://core-whisper:10300.
+    description: Ahová a hangot továbbküldi szövegfelismerésre. Nabu Casa felhő (ajánlott, jó magyar felismerés) – ha://stt.home_assistant_cloud. Helyi Whisper app – tcp://core-whisper:10300.
   port:
     name: Wyoming port
     description: Ezen a porton csatlakozik a hangpipeline.

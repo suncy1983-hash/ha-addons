@@ -1,7 +1,7 @@
 configuration:
   upstream_uri:
     name: Speech-to-text address
-    description: The real Wyoming speech-to-text service the audio is forwarded to. For the Whisper app use tcp://core-whisper:10300.
+    description: Where the audio is forwarded for transcription. Nabu Casa cloud (recommended) – ha://stt.home_assistant_cloud. Local Whisper app – tcp://core-whisper:10300.
   port:
     name: Wyoming port
     description: The voice pipeline connects to this port.

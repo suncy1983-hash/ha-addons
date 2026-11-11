@@ -211,3 +211,78 @@ def test_proxy_end_to_end(store):
                          (None, "kapcsold fel a lámpát"), ("Anna", "kapcsold fel a lámpát")]
     assert len(store.recent()) == 4
     assert json.loads((store.root / "speakers.json").read_text())["Anna"]["samples"]
+
+
+# --------------------------------------------------------------------------------------------
+# Home Assistant STT cél (ha://), pl. Nabu Casa felhő
+async def _fake_ha(port: int, received: dict):
+    from aiohttp import web
+
+    async def describe(request: web.Request):
+        assert request.headers.get("Authorization") == "Bearer teszt"
+        return web.json_response({"languages": ["hu-HU", "en-US"], "formats": ["wav"]})
+
+    async def stt(request: web.Request):
+        received["engine"] = request.match_info["engine"]
+        received["meta"] = request.headers.get("X-Speech-Content")
+        received["bytes"] = len(await request.read())
+        return web.json_response({"result": "success", "text": "indítsd el a netflixet"})
+
+    app = web.Application()
+    app.router.add_get("/api/stt/{engine}", describe)
+    app.router.add_post("/api/stt/{engine}", stt)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    await web.TCPSite(runner, "127.0.0.1", port).start()
+    return runner
+
+
+def test_proxy_home_assistant_stt(store, monkeypatch):
+    monkeypatch.setenv("HA_URL", "http://127.0.0.1:18400")
+    monkeypatch.setenv("HA_TOKEN", "teszt")
+    store.add_sample("Anna", tone(200), "kezi")
+    published: list = []
+    received: dict = {}
+
+    async def scenario():
+        runner = await _fake_ha(18400, received)
+
+        async def publish(result: Result, text: str, satellite):
+            published.append((result.speaker, text))
+
+        proxy = AsyncServer.from_uri("tcp://127.0.0.1:18460")
+        info = UpstreamInfo("ha://stt.home_assistant_cloud", "test")
+        task = asyncio.create_task(proxy.run(partial(ProxyHandler, store=store, upstream=info, publish=publish)))
+        await asyncio.sleep(0.2)
+        try:
+            async with AsyncClient.from_uri("tcp://127.0.0.1:18460") as c:
+                await c.write_event(Describe().event())
+                described = Info.from_event(await c.read_event())
+            assert described.asr[0].models[0].languages == ["en", "en-US", "hu", "hu-HU"]
+            assert await _say(18460, tone(200, noise=0.01)) == "indítsd el a netflixet"
+        finally:
+            task.cancel()
+            await runner.cleanup()
+
+    asyncio.run(scenario())
+    assert published == [("Anna", "indítsd el a netflixet")]
+    assert received["engine"] == "stt.home_assistant_cloud"
+    assert "language=hu-HU" in received["meta"] and "sample_rate=16000" in received["meta"]
+    assert received["bytes"] == len(pcm(tone(200)))
+
+
+def test_ha_target_parsing_and_language(monkeypatch):
+    from hangfelismero import hastt
+
+    monkeypatch.delenv("HA_URL", raising=False)
+    monkeypatch.setenv("SUPERVISOR_TOKEN", "sv")
+    target = hastt.parse_target("ha://stt.home_assistant_cloud?language=hu-HU")
+    assert target.url == "http://supervisor/core/api/stt/stt.home_assistant_cloud"
+    assert target.headers == {"Authorization": "Bearer sv"}
+    assert target.language_for("hu") == "hu-HU"
+    assert target.language_for("hu-HU") == "hu-HU"
+    assert target.language_for("en") == "en"
+    assert target.language_for(None) == "hu-HU"
+    assert hastt.parse_target("ha://stt.x").language == "hu-HU"
+    with pytest.raises(ValueError):
+        hastt.parse_target("ha://")

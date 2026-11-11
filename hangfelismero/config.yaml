@@ -1,7 +1,7 @@
 name: Hangfelismerő
-version: "0.1.1"
+version: "0.2.0"
 slug: hangfelismero
-description: Felismeri, ki beszél a hangsegédhez, és átadja a Sentientnek (Wyoming proxy a Whisper elé)
+description: Felismeri, ki beszél a hangsegédhez, és átadja a Sentientnek (Wyoming proxy a Whisper vagy a Home Assistant felhős STT elé)
 url: https://github.com/suncy1983-hash/ha-addons
 arch:
   - amd64
@@ -14,6 +14,7 @@ ingress_port: 8099
 panel_icon: mdi:account-voice
 panel_title: Hangfelismerő
 hassio_api: true
+homeassistant_api: true
 discovery:
   - wyoming
 services:
@@ -23,7 +24,7 @@ ports:
 ports_description:
   10360/tcp: Wyoming (a hangpipeline ide csatlakozik)
 options:
-  upstream_uri: tcp://core-whisper:10300
+  upstream_uri: ha://stt.home_assistant_cloud
   port: 10360
   threads: 2
   log_level: info

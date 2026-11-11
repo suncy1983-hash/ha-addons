@@ -21,9 +21,10 @@ from wyoming.audio import AudioChunk, AudioStart, AudioStop
 from wyoming.client import AsyncClient
 from wyoming.error import Error
 from wyoming.event import Event
-from wyoming.info import AsrProgram, Attribution, Describe, Info
+from wyoming.info import AsrModel, AsrProgram, Attribution, Describe, Info
 from wyoming.server import AsyncEventHandler
 
+from . import hastt
 from .engine import RATE, Result, SpeakerStore, pcm_to_float
 
 _LOGGER = logging.getLogger(__name__)
@@ -40,10 +41,13 @@ class UpstreamInfo:
     def __init__(self, uri: str, version: str) -> None:
         self.uri = uri
         self.version = version
+        self.ha_target = hastt.parse_target(uri) if hastt.is_ha_uri(uri) else None
         self._info: Info | None = None
         self._fetched = 0.0
 
     async def get(self) -> Info:
+        if self.ha_target is not None:
+            return await self._get_ha()
         if self._info is None or time.monotonic() - self._fetched > 300:
             try:
                 async with AsyncClient.from_uri(self.uri, connect_timeout=5, read_timeout=10) as client:
@@ -57,6 +61,24 @@ class UpstreamInfo:
                             break
             except (OSError, asyncio.TimeoutError, ConnectionError) as err:
                 _LOGGER.warning("A beszédfelismerő (%s) nem érhető el: %s", self.uri, err)
+        return self._wrap(self._info)
+
+    async def _get_ha(self) -> Info:
+        """Home Assistant STT célnál a modelleket a szolgáltató nyelveiből rakjuk össze."""
+        target = self.ha_target
+        assert target is not None
+        if self._info is None or time.monotonic() - self._fetched > 300:
+            languages = await hastt.describe(target)
+            if languages is not None:
+                # a pipeline „hu”-t és „hu-HU”-t is küldhet: mindkettőt felajánljuk
+                codes = sorted({*languages, *(lang.split("-")[0] for lang in languages)})
+                attribution = Attribution(name="Home Assistant", url="https://www.home-assistant.io")
+                model = AsrModel(name=target.engine, description=target.engine, attribution=attribution,
+                                 installed=True, version=None, languages=codes)
+                self._info = Info(asr=[AsrProgram(name=target.engine, description=target.engine,
+                                                  attribution=attribution, installed=True, version=None,
+                                                  models=[model])])
+                self._fetched = time.monotonic()
         return self._wrap(self._info)
 
     def _wrap(self, upstream: Info | None) -> Info:
@@ -86,6 +108,7 @@ class ProxyHandler(AsyncEventHandler):
         self.upstream = upstream
         self.publish = publish
         self._client: AsyncClient | None = None
+        self._ha: hastt.HaSttSession | None = None
         self._transcribe: Transcribe | None = None
         self._format: tuple[int, int, int] = (RATE, 2, 1)
         self._pcm = bytearray()
@@ -134,6 +157,9 @@ class ProxyHandler(AsyncEventHandler):
 
     # ------------------------------------------------------------------------------------
     async def _forward(self, event: Event) -> None:
+        if self.upstream.ha_target is not None:
+            self._forward_ha(event)
+            return
         if self._client is None:
             self._client = AsyncClient.from_uri(self.upstream.uri, connect_timeout=5)
             await self._client.connect()
@@ -141,7 +167,27 @@ class ProxyHandler(AsyncEventHandler):
                 await self._client.write_event(self._transcribe.event())
         await self._client.write_event(event)
 
+    def _forward_ha(self, event: Event) -> None:
+        """Home Assistant STT cél: a hangot élőben töltjük fel, a többi eseményre nincs szükség."""
+        target = self.upstream.ha_target
+        assert target is not None
+        if AudioStart.is_type(event.type) or (AudioChunk.is_type(event.type) and self._ha is None):
+            if self._ha is not None:
+                asyncio.create_task(self._ha.cancel())
+            language = self._transcribe.language if self._transcribe else None
+            self._ha = hastt.HaSttSession(target, language, self._format)
+            self._ha.start()
+        if AudioChunk.is_type(event.type):
+            assert self._ha is not None
+            self._ha.write(AudioChunk.from_event(event).audio, self._format)
+        elif AudioStop.is_type(event.type) and self._ha is not None:
+            self._ha.end()
+
     async def _read_transcript(self) -> Transcript:
+        if self.upstream.ha_target is not None:
+            if self._ha is None:
+                return Transcript(text="")
+            return Transcript(text=await self._ha.result())
         assert self._client is not None
         while True:
             event = await self._client.read_event()
@@ -206,6 +252,9 @@ class ProxyHandler(AsyncEventHandler):
             loop.run_in_executor(None, keep)
 
     async def _close_client(self) -> None:
+        if self._ha is not None:
+            await self._ha.cancel()
+            self._ha = None
         if self._client is not None:
             try:
                 await self._client.disconnect()

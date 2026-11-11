@@ -1,21 +1,33 @@
 # Hangfelismerő
 
 Felismeri, **ki beszél** a hangsegédhez, és ezt átadja Home Assistantnek és a Sentientnek.
-Minden a NUC-on fut, felhő nélkül.
+A beszélőazonosítás helyben, a NUC-on fut. A szövegfelismerést a választott szolgáltató végzi.
 
 ## Hogyan működik
 
-A hangpipeline-ban a beszédfelismerő (STT) helyére kerül, és a hangot élőben továbbküldi a Whispernek.
-A felvétel végén, a Whisperrel párhuzamosan, egy CAM++ hangmodell (~0,1 mp) eldönti, kinek a hangja szólt.
+A hangpipeline-ban a beszédfelismerő (STT) helyére kerül, és a hangot élőben továbbküldi a valódi
+szövegfelismerőnek. A felvétel végén, azzal párhuzamosan, egy CAM++ hangmodell (~0,1 mp) eldönti,
+kinek a hangja szólt.
 Az eredményt **előbb** közli MQTT-n, és csak utána adja vissza a szöveget. Így mire a Sentient megkapja
 a kérést, a `sensor.hangfelismero_beszelo` már a friss nevet mutatja.
+
+## Szövegfelismerő választása (`upstream_uri`)
+
+| Cím | Mit használ |
+|---|---|
+| `ha://stt.home_assistant_cloud` | **Ajánlott.** A Home Assistant felhős STT-je (Nabu Casa), jó magyar felismeréssel. |
+| `ha://stt.home_assistant_cloud?language=hu-HU` | Ugyanez, megadott nyelvvel (alapértelmezés: `hu-HU`). |
+| `ha://<bármely stt entitás>` | Bármely Home Assistantben beállított beszéd-szöveg szolgáltató. |
+| `tcp://core-whisper:10300` | A helyi Whisper app (Wyoming). Teljesen helyi, de magyarul gyengébb. |
+
+`ha://` címnél a hang a Home Assistant STT API-ján keresztül megy, élőben, így nincs plusz várakozás.
 
 ## Beállítás
 
 1. Indítsd el az appot. Home Assistant felajánlja a *Wyoming Protocol* integrációt
    (Beállítások → Eszközök és szolgáltatások → Felfedezve). Add hozzá.
 2. **Beállítások → Hangsegédek** → a hangsegéded → *Beszéd-szöveg*: válaszd a **hangfelismero**-t.
-   A nyelv maradjon magyar; a háttérben a Whisper dolgozik tovább.
+   A nyelv maradjon magyar; a szöveget a beállított szövegfelismerő adja.
 3. Nyisd meg az oldalsávban a **Hangfelismerő** panelt, és add hozzá a háztartás tagjait.
 4. Beszélj a hangsegédhez néhányszor, majd a *Legutóbbi hangok* listában jelöld meg, ki volt az.
    Beszélőnként 3–5 minta elég. Utána a biztos találatokból magától tanul tovább.

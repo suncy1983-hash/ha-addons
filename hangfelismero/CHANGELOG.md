@@ -1,5 +1,12 @@
 # Változások
 
+## 0.2.0
+
+- Új: a szövegfelismerést a Home Assistant saját STT szolgáltatása is végezheti, pl. a Nabu Casa felhő
+  (`ha://stt.home_assistant_cloud`). A hang élőben megy fel, a beszélőazonosítás továbbra is helyben fut.
+- Ez lett az alapértelmezett cím, mert a helyi Whisper magyarul gyakran félreérti a parancsokat.
+  Meglévő telepítésnél a Beállításokban kell átírni a címet.
+
 ## 0.1.1
 
 - Javítva: a NUC-on nem épült fel az image (a Supervisor az elavult build.yaml helyett Alpine alapra épített); a Debian alap most a Dockerfile-ban van
